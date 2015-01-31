@@ -7,11 +7,12 @@
 -define(PROXY_PORT,1234).
 -define(CONNECT_TIMEOUT, 5000).
 
+-define(POOL_SIZE,50).
+
 -export([
 		back_start/0,
 		flip/1,
 		front_start/0,
-		%%front_process/1,
 		back_process/1,
 		forward/3,
 		forward/4,
@@ -143,7 +144,7 @@ front_start(Args) ->
                                              binary]),
 
 
-    Pool = spawn(?MODULE,front_preconnection_backend,[self(),[],50]),
+    Pool = spawn(?MODULE,front_preconnection_backend,[self(),[],?POOL_SIZE]),
     register(pool,Pool),
 
     spawn(?MODULE,front_accept,[Socket]),
@@ -196,6 +197,7 @@ front_idle_connection(Parent,Backend) ->
 
             receive
                 {close} ->
+                    %%io:format("~p~n",[[closed,Front]]),
                     gen_tcp:close(Front),
                     gen_tcp:close(Backend)
             end  
@@ -215,34 +217,49 @@ front_idle_connection(Parent,Backend) ->
 
 front_init_preconnection(List,0) ->
     List;
-front_init_preconnection(List,Num)->   
+front_init_preconnection(List,1)->   
     case front_idle_connection() of 
         {ok,Child} ->
-            NewList = lists:append(List,[Child]),
-            NewNum = Num - 1,
-            %%io:format("created a socket ~n"),
-            front_init_preconnection(NewList,NewNum);
+            io:format("init Socket~n"),
+            lists:append(List,[Child]);
+            %%NewNum = Num - 1,
+            %%front_init_preconnection(NewList,NewNum);
         _ ->
-            timer:sleep(2000),
-            front_init_preconnection(List,Num)
+            timer:sleep(1000),
+            front_init_preconnection(List,1)
     end.        
     
 front_preconnection_backend(Parent,List,NumNeed) ->
-    NewList = front_init_preconnection(List,NumNeed),
+    
+    %%io:format("current pool size ~p~n",[?POOL_SIZE-NumNeed]),
 
-    %%io:format("~p~n",[NewList]),
-    receive
-        {connect,Front} ->
-            [Child | CNewList] = NewList,
-            Child ! {socket,Front},
-            %%io:format("dispached a socket ~n"),
-            front_preconnection_backend(Parent,CNewList,1);
-        {closed,Child} ->
-            CNewList = lists:delete(Child,NewList),
-            front_preconnection_backend(Parent,CNewList,1);    
+    case ?POOL_SIZE-NumNeed of
+        0 ->
+            NewList = front_init_preconnection(List,1),
+            front_preconnection_backend(Parent,NewList,NumNeed-1);
         _ ->
-           Parent ! {close}     
-    after
-        10000 ->
-            front_preconnection_backend(Parent,NewList,0)
-    end. 
+            receive
+                {connect,Front} ->
+                    [Child | NewList] = List,
+                    Child ! {socket,Front},
+                    front_preconnection_backend(Parent,NewList,NumNeed+1);
+                {closed,Child} ->
+                    io:format("~p~n",[[remove,Child]]),
+                    NewList = lists:delete(Child,List),
+                    front_preconnection_backend(Parent,NewList,NumNeed+1);    
+                _ ->
+                   Parent ! {close}
+            after
+                0 ->
+                    case NumNeed of
+                        0 ->
+                            timer:sleep(1000),
+                            front_preconnection_backend(Parent,List,NumNeed);
+                        _ ->
+                            NewList = front_init_preconnection(List,1),
+                            front_preconnection_backend(Parent,NewList,NumNeed-1)
+                    end            
+            end
+    end.       
+
+     
