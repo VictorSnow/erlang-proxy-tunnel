@@ -3,7 +3,7 @@
 -define(FRONT_PORT, 1234).
 -define(BACK_PORT, 1235).
 
--define(PROXY_IP,'106.187.*').
+-define(PROXY_IP,'106.187.41.166').
 -define(PROXY_PORT,1234).
 -define(CONNECT_TIMEOUT, 5000).
 
@@ -15,7 +15,6 @@
 		front_start/0,
 		back_process/1,
 		forward/3,
-		forward/4,
 		flip_recv/3,
 		flip_send/2,
 		heart/0,
@@ -100,7 +99,8 @@ back_process(Front) ->
                             end
                 end;            
             {error,Reason} ->
-                io:format("Heart beat error ~p~n",[Reason])
+                io:format("Heart beat error ~p~n",[Reason]),
+                gen_tcp:close(Front)
         end            
     catch
         Error:CReason ->
@@ -109,20 +109,16 @@ back_process(Front) ->
     end.
 
 forward(Client, Remote, From) ->
-    forward(Client, Remote, From, fun(_Args) -> ok end).
-
-forward(Client, Remote, From, Fun) ->
     try
         {ok, Packet} = gen_tcp:recv(Client, 0),
         ok = flip_send(Remote, Packet),
-        Fun([Client, Remote, Packet]),
         ok
     catch
         Error:Reason ->
             From ! {close},
             exit({Error, Reason})
     end,
-    forward(Client, Remote, From, Fun).
+    forward(Client, Remote, From).
 
 
 
