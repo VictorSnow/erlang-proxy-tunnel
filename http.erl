@@ -1,10 +1,6 @@
 -module(http).
 
--define(FRONT_PORT, 1234).
--define(BACK_PORT, 1235).
-
--define(PROXY_IP,'106.187.41.166').
--define(PROXY_PORT,1234).
+-include("http.hrl").
 -define(CONNECT_TIMEOUT, 5000).
 
 -define(POOL_SIZE,50).
