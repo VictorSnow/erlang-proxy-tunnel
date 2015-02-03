@@ -1,108 +1,15 @@
--module(http).
+-module(front).
 
 -include("http.hrl").
--define(CONNECT_TIMEOUT, 5000).
 
--define(POOL_SIZE,50).
 
 -export([
-		back_start/0,
-		flip/1,
 		front_start/0,
-		back_process/1,
-		forward/3,
-		flip_recv/3,
-		flip_send/2,
-		heart/0,
-		start/0,
-        front_preconnection_backend/3,
-        front_idle_connection/0,
-        front_idle_connection/2,
-        front_accept/1
+		front_idle_connection/0,
+		front_idle_connection/2,
+		front_preconnection_backend/3,
+		front_accept/1
 	]).
-
-
-flip(L) ->
-    flip(L, 16#66).
-
-flip(L,V) ->
-    << <<(X bxor V)>> ||  <<X>> <= L   >> .
-
-
-flip_recv(Client, Length, Timeout) ->
-    {ok, Data} = gen_tcp:recv(Client, Length, Timeout),
-    {ok, flip(Data)}.
-
-flip_send(Client, Data) ->
-    gen_tcp:send(Client, flip(Data)).
-
-
-heart() ->
-    timer:sleep(10000),
-    io:format(".~n"),
-    heart().
-
-
-back_start() ->
-    back_start(['0.0.0.0', ?BACK_PORT]).
-
-back_start(Args) ->
-    % prevent disconnect when run in ssh
-    spawn(?MODULE, heart, []),
-    [BackAddressStr, BackPortStr] = Args,
-   	BackPort = BackPortStr,
-    {ok, BackAddress} = inet:getaddr(BackAddressStr, inet),
-    io:format("back listen at ~s:~p.~n", [BackAddressStr, BackPort]),
-    {ok, Socket} = gen_tcp:listen(BackPort, [{reuseaddr, true},
-                                             {active, false},
-                                             {ifaddr, BackAddress},
-                                             {nodelay, true},
-                                             binary]),
-    back_accept(Socket).
-
-
-back_accept(Socket) ->
-    {ok, Client} = gen_tcp:accept(Socket),
-    spawn(?MODULE, back_process, [Client]),
-    back_accept(Socket).
-
-
-back_process(Front) ->
-    	case  gen_tcp:recv(Front,4) of 
-            {ok,Packet} ->
-                case Packet of
-                    <<1,1,0,0>> ->
-                        %% heart beat package
-                        back_process(Front);
-                    <<0,1,0,1>> ->
-                        %% start to communicate
-                            From = self(),
-                            {ok, Remote} = gen_tcp:connect(?PROXY_IP,
-                                      ?PROXY_PORT,
-                                       [{active, false}, binary, {nodelay, true}],
-                                       ?CONNECT_TIMEOUT),
-
-                            spawn(?MODULE, forward, [Front, Remote, From]),
-                            spawn(?MODULE, forward, [Remote, Front, From]),
-                            receive
-                                {close} ->
-                                    gen_tcp:close(Front),
-                                    gen_tcp:close(Remote)
-                            end
-                end;            
-            {error,_Reason} ->
-                gen_tcp:close(Front)
-        end.            
-    
-forward(Client, Remote, From) ->
-    case gen_tcp:recv(Client,0) of
-        {ok,Packet} ->
-            flip_send(Remote, Packet),
-            forward(Client,Remote,From);
-        {error,_} ->
-            From ! {close}
-    end.        
-
 
 %% front server
 front_start() ->
@@ -110,7 +17,7 @@ front_start() ->
 
 front_start(Args) ->
     % prevent disconnect when run in ssh
-    spawn(?MODULE, heart, []),
+    spawn(util, heart, []),
     [BackAddressStr, BackPortStr] = Args,
     BackPort = BackPortStr,
     {ok, BackAddress} = inet:getaddr(BackAddressStr, inet),
@@ -137,16 +44,6 @@ front_accept(Socket) ->
     {ok, Client} = gen_tcp:accept(Socket),
     pool ! {connect,Client},
     front_accept(Socket).
-
-start() ->
-	spawn(?MODULE, back_start, []),
-    spawn(?MODULE, front_start, []),
-    receive
-        {close} ->
-            exit({done})
-    end.
-
-
 
 
 front_idle_connection() ->
@@ -180,7 +77,7 @@ front_idle_connection(Parent,Backend) ->
                     gen_tcp:close(Backend)
             end  
     after
-        5000 ->
+        10000 ->
             %% heart beat
             case gen_tcp:send(Backend,<<1,1,0,0>>) of
                 ok ->
@@ -238,6 +135,4 @@ front_preconnection_backend(Parent,List,NumNeed) ->
                             front_preconnection_backend(Parent,NewList,NumNeed-1)
                     end            
             end
-    end.       
-
-     
+    end.   

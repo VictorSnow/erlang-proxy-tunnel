@@ -1,5 +1,6 @@
 -define(FRONT_PORT, 1234).
 -define(BACK_PORT, 1235).
-
+-define(CONNECT_TIMEOUT, 5000).
+-define(POOL_SIZE,50).
 -define(PROXY_IP,'*').
 -define(PROXY_PORT,1234).
