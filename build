@@ -1,1 +1,0 @@
-erlc util.erl && erlc back.erl && erlc front.erl
