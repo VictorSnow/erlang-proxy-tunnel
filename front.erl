@@ -67,8 +67,8 @@ front_idle_connection(Parent,Backend) ->
 
             ok = gen_tcp:send(Backend,<<0,1,0,1>>),
 
-            spawn(?MODULE, forward, [Front, Backend, self()]),
-            spawn(?MODULE, forward, [Backend, Front, self()]),
+            spawn(util, forward, [Front, Backend, self()]),
+            spawn(util, forward, [Backend, Front, self()]),
 
             receive
                 {close} ->
