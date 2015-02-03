@@ -108,6 +108,14 @@ front_preconnection_backend(Parent,List,NumNeed) ->
     
     %%io:format("current pool size ~p~n",[?POOL_SIZE-NumNeed]),
 
+    case NumNeed of
+    	0 ->
+    		WaitInterval = 5000;
+    	_ ->
+    		WaitInterval = 0
+    end,			
+
+
     case ?POOL_SIZE-NumNeed of
         0 ->
             NewList = front_init_preconnection(List,1),
@@ -125,10 +133,9 @@ front_preconnection_backend(Parent,List,NumNeed) ->
                 _ ->
                    Parent ! {close}
             after
-                0 ->
+                WaitInterval ->
                     case NumNeed of
                         0 ->
-                            timer:sleep(1000),
                             front_preconnection_backend(Parent,List,NumNeed);
                         _ ->
                             NewList = front_init_preconnection(List,1),
