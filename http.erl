@@ -68,14 +68,11 @@ back_accept(Socket) ->
 
 
 back_process(Front) ->
-    try
-        %% recv heart beat
-		case  gen_tcp:recv(Front,4) of 
+    	case  gen_tcp:recv(Front,4) of 
             {ok,Packet} ->
                 case Packet of
                     <<1,1,0,0>> ->
                         %% heart beat package
-                        %%io:format("heart beat received~n"),
                         back_process(Front);
                     <<0,1,0,1>> ->
                         %% start to communicate
@@ -87,35 +84,24 @@ back_process(Front) ->
 
                             spawn(?MODULE, forward, [Front, Remote, From]),
                             spawn(?MODULE, forward, [Remote, Front, From]),
-                            %%io:format("start communicate~n"),
                             receive
                                 {close} ->
                                     gen_tcp:close(Front),
                                     gen_tcp:close(Remote)
                             end
                 end;            
-            {error,Reason} ->
-                io:format("Heart beat error ~p~n",[Reason]),
+            {error,_Reason} ->
                 gen_tcp:close(Front)
-        end            
-    catch
-        Error:CReason ->
-            io:format("~p ~p ~p ~p.~n", [Front, Error, CReason, erlang:get_stacktrace()]),
-            gen_tcp:close(Front)
-    end.
-
+        end.            
+    
 forward(Client, Remote, From) ->
-    try
-        {ok, Packet} = gen_tcp:recv(Client, 0),
-        ok = flip_send(Remote, Packet),
-        ok
-    catch
-        Error:Reason ->
-            From ! {close},
-            exit({Error, Reason})
-    end,
-    forward(Client, Remote, From).
-
+    case gen_tcp:recv(Client,0) of
+        {ok,Packet} ->
+            flip_send(Remote, Packet),
+            forward(Client,Remote,From);
+        {error,_} ->
+            From ! {close}
+    end.        
 
 
 %% front server
