@@ -1,6 +1,9 @@
--define(FRONT_PORT, 1234).
+%% port map : [FrontPort,BackendPort]
+-define(FRONT_PORT, [[1234,1234],[1235,3306],[1236,19]]).
+%% back proxy listen port
 -define(BACK_PORT, 1235).
 -define(CONNECT_TIMEOUT, 5000).
+%% connection pool size
 -define(POOL_SIZE,50).
+%% proxy ip address
 -define(PROXY_IP,'*').
--define(PROXY_PORT,1234).

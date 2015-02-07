@@ -15,7 +15,6 @@
 front_server() ->
     Pool = spawn(?MODULE,front_preconnection_backend,[self(),[],?POOL_SIZE]),
     register(pool,Pool),
-
     front_server_start(?FRONT_PORT),
     receive 
         {close} ->
