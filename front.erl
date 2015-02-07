@@ -13,6 +13,9 @@
 	]).
 
 front_server() ->
+    Pool = spawn(?MODULE,front_preconnection_backend,[self(),[],?POOL_SIZE]),
+    register(pool,Pool),
+
     front_server_start(?FRONT_PORT),
     receive 
         {close} ->
@@ -24,7 +27,7 @@ front_server_start([]) ->
 
 front_server_start(Ports) ->
     [[Front,Back]|Remain] = Ports,
-    spawn(?MODULE,front_start,['0.0.0.0',Front,Back]),
+    spawn(?MODULE,front_start,[['0.0.0.0',Front,Back]]),
     front_server_start(Remain).
 
 %% front server
@@ -46,10 +49,6 @@ front_start(Args) ->
                                              {ifaddr, FrontAddress},
                                              {nodelay, true},
                                              binary]),
-
-
-    Pool = spawn(?MODULE,front_preconnection_backend,[self(),[],?POOL_SIZE]),
-    register(pool,Pool),
 
     spawn(?MODULE,front_accept,[Socket,BackPort]),
 
