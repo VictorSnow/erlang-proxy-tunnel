@@ -1,2 +1,2 @@
 ./build
-erl -noshell -detached -s front front_start
+erl -noshell -s front front_server
