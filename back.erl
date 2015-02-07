@@ -40,7 +40,8 @@ back_process(Front) ->
                     <<0,1,0,1>> ->
                         %% start to communicate
                             From = self(),
-                            <<Port:16>> = gen_tcp:recv(Front,2),
+                            {ok,<<Port:16>>} = gen_tcp:recv(Front,2),
+				io:format("~p~n",[Port]),
                             {ok, Remote} = gen_tcp:connect("127.0.0.1",
                                        Port,
                                        [{active, false}, binary, {nodelay, true}],
