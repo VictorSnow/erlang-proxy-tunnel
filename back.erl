@@ -40,8 +40,9 @@ back_process(Front) ->
                     <<0,1,0,1>> ->
                         %% start to communicate
                             From = self(),
-                            {ok, Remote} = gen_tcp:connect(?PROXY_IP,
-                                      ?PROXY_PORT,
+                            <<Port:16>> = gen_tcp:recv(Front,2),
+                            {ok, Remote} = gen_tcp:connect("127.0.0.1",
+                                       Port,
                                        [{active, false}, binary, {nodelay, true}],
                                        ?CONNECT_TIMEOUT),
 

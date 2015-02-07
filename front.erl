@@ -4,27 +4,46 @@
 
 
 -export([
-		front_start/0,
+		front_server/0,
+        front_start/1,
 		front_idle_connection/0,
 		front_idle_connection/2,
 		front_preconnection_backend/3,
-		front_accept/1
+		front_accept/2
 	]).
 
+front_server() ->
+    front_server_start(?FRONT_PORT),
+    receive 
+        {close} ->
+            io:format("closed")
+    end.        
+
+front_server_start([]) ->
+    [];
+
+front_server_start(Ports) ->
+    [[Front,Back]|Remain] = Ports,
+    spawn(?MODULE,front_start,['0.0.0.0',Front,Back]),
+    front_server_start(Remain).
+
 %% front server
-front_start() ->
-    front_start(['0.0.0.0', ?FRONT_PORT]).
+%%front_server_start(Front,Back) ->
+%%    front_start(['0.0.0.0', ?FRONT_PORT,1234]).
+    %%spawn(?MODULE,front_start,['0.0.0.0',Front,Back]),
+       
+
 
 front_start(Args) ->
     % prevent disconnect when run in ssh
     spawn(util, heart, []),
-    [BackAddressStr, BackPortStr] = Args,
-    BackPort = BackPortStr,
-    {ok, BackAddress} = inet:getaddr(BackAddressStr, inet),
-    io:format("front listen at ~s:~p.~n", [BackAddressStr, BackPort]),
-    {ok, Socket} = gen_tcp:listen(BackPort, [{reuseaddr, true},
+    [FrontAddressStr, FrontPort,BackPort] = Args,
+    %% BackPort = BackPortStr,
+    {ok, FrontAddress} = inet:getaddr(FrontAddressStr, inet),
+    io:format("front listen at ~s:~p.~n", [FrontAddressStr, FrontPort]),
+    {ok, Socket} = gen_tcp:listen(FrontPort, [{reuseaddr, true},
                                              {active, false},
-                                             {ifaddr, BackAddress},
+                                             {ifaddr, FrontAddress},
                                              {nodelay, true},
                                              binary]),
 
@@ -32,7 +51,7 @@ front_start(Args) ->
     Pool = spawn(?MODULE,front_preconnection_backend,[self(),[],?POOL_SIZE]),
     register(pool,Pool),
 
-    spawn(?MODULE,front_accept,[Socket]),
+    spawn(?MODULE,front_accept,[Socket,BackPort]),
 
     receive 
         {close} ->
@@ -40,10 +59,10 @@ front_start(Args) ->
     end.
 
 
-front_accept(Socket) ->
+front_accept(Socket,BackPort) ->
     {ok, Client} = gen_tcp:accept(Socket),
-    pool ! {connect,Client},
-    front_accept(Socket).
+    pool ! {connect,Client,BackPort},
+    front_accept(Socket,BackPort).
 
 
 front_idle_connection() ->
@@ -62,10 +81,10 @@ front_idle_connection() ->
 
 front_idle_connection(Parent,Backend) ->
     receive
-        {socket,Front} ->
+        {socket,Front,Port} ->
             %%io:format("communicate a socket ~n"),
 
-            ok = gen_tcp:send(Backend,<<0,1,0,1>>),
+            ok = gen_tcp:send(Backend,<<0,1,0,1,Port:16>>),
 
             spawn(util, forward, [Front, Backend, self()]),
             spawn(util, forward, [Backend, Front, self()]),
@@ -122,9 +141,9 @@ front_preconnection_backend(Parent,List,NumNeed) ->
             front_preconnection_backend(Parent,NewList,NumNeed-1);
         _ ->
             receive
-                {connect,Front} ->
+                {connect,Front,Port} ->
                     [Child | NewList] = List,
-                    Child ! {socket,Front},
+                    Child ! {socket,Front,Port},
                     front_preconnection_backend(Parent,NewList,NumNeed+1);
                 {closed,Child} ->
                     io:format("~p~n",[[remove,Child]]),

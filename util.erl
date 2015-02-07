@@ -3,7 +3,8 @@
 -export([
 		forward/3,
 		flip_send/2,
-		heart/0
+		heart/0,
+		main/0
 	]).
 
 forward(Client, Remote, From) ->
@@ -28,3 +29,8 @@ heart() ->
     timer:sleep(10000),
     io:format(".~n"),
     heart().    
+
+main() ->
+	Data = flip(<<11111111,1,0,0,1,0,0,0>>),
+	io:format("~p~n",[Data]),
+	io:format("~p~n",[flip(Data)]).   
