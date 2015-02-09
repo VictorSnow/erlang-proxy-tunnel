@@ -10,8 +10,12 @@
 forward(Client, Remote, From) ->
     case gen_tcp:recv(Client,0) of
         {ok,Packet} ->
-            flip_send(Remote, Packet),
-            forward(Client,Remote,From);
+            case flip_send(Remote, Packet) of
+                ok ->
+                    forward(Client,Remote,From);
+                error ->
+                    From ! {close}
+            end;        
         {error,_} ->
             From ! {close}
     end. 
@@ -22,8 +26,23 @@ flip(L) ->
 flip(L,V) ->
     << <<(X bxor V)>> ||  <<X>> <= L   >> .
 
-flip_send(Client, Data) ->
-    gen_tcp:send(Client, flip(Data)).
+flip_send(Client,Data) ->
+    flip_send(Client,Data,5).
+
+
+flip_send(Client,Data,0) ->
+    gen_tcp:send(Client, flip(Data));
+
+flip_send(Client, Data,RetryTime) ->
+    case gen_tcp:send(Client, flip(Data)) of
+        ok ->
+            ok;
+        {error,etimeout} ->
+            io:format("Retry To Send Packet"),
+            flip_send(Client,Data,RetryTime-1);
+        {error,_Reason} ->
+            error    
+    end.            
 
 heart() ->
     timer:sleep(10000),
