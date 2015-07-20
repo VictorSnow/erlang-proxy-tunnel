@@ -21,13 +21,13 @@ forward(Client, Remote, From) ->
     end. 
 
 flip(L) ->
-    flip(L, 16#66).
+    flip(L, 16#60).
 
 flip(L,V) ->
     << <<(X bxor V)>> ||  <<X>> <= L   >> .
 
 flip_send(Client,Data) ->
-    flip_send(Client,Data,5).
+    flip_send(Client,Data,0).
 
 
 flip_send(Client,Data,0) ->
